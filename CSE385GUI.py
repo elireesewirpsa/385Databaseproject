@@ -1,7 +1,7 @@
 import tkinter as tk
-from tkinter import ttk
-import csv
-from pathlib import Path
+from tkinter import ttk, messagebox
+import mysql.connector
+from mysql.connector import Error
 
 
 class CustomerTable:
@@ -49,48 +49,79 @@ class CustomerTable:
         frame.grid_columnconfigure(0, weight=1)
         
         # load
-        self.load_csv_data()
+        self.load_data()
 
-    def load_csv_data(self):
+    def database_connection(self):
         try:
-            path = Path('assignment3.csv')
+            print("Attempting to connect to database...")
+            connection = mysql.connector.connect(
+                host='127.0.0.1',
+                port=3306,
+                user='root',
+                password='reesewej',  # Replace with your password
+                database='world'
+            )
+            if connection.is_connected():
+                print("Successfully connected to database!")
+            return connection
+        except Error as e:
+            print(f"Connection error: {e}")
+            messagebox.showerror("Connection Error", 
+                f"Error connecting to MySQL database: {e}")
+            return None
 
-            with open(path, 'r') as file:
-                # semicolon as delimeter
-                csv_reader = csv.reader(file, delimiter=';', quotechar='"')
-                next(csv_reader)  # skip header row
-                
-                # loading data
-                for row in csv_reader:
-                    if len(row) >= 5:
-                        # remove quotes
-                        cleaned_row = [field.strip('"') for field in row]
-                        
-                        # pop format with commas 
-                        try:
-                            population = f"{int(cleaned_row[4]):,}"
-                        except ValueError:
-                            population = cleaned_row[4]
-                            
-                        self.table.insert('', 'end', values=(
-                            cleaned_row[0],  # ID
-                            cleaned_row[1],  # Name
-                            cleaned_row[2],  # Country Code
-                            cleaned_row[3],  # District
-                            population       # pop
-                        ))
-                    else:
-                        print(f"Skipping invalid row: {row}")
-
-        except FileNotFoundError:
-            print("File 'assignment3.csv' not found")
+    def load_data(self):
+        
+        
+        connection = self.database_connection()
+        
+        if not connection:
+            print("No connection available")
+            return
+            
+        try:
+            
+            cursor = connection.cursor()
+            
+            ## select query
+            cursor.execute("SELECT * FROM city;")  # First test with limit
+            
+            ## gets all rows
+            rows = cursor.fetchall()
+            
+            
+            # Clear existing items
+            for item in self.table.get_children():
+                self.table.delete(item)
+            
+            # Load new data
+            
+            for row in rows:
+                self.table.insert('', 'end', values=(
+                    row[0],  # ID
+                    row[1],  # Name
+                    row[2],  # Country Code
+                    row[3],  # District
+                    f"{row[4]:,}"  # Population with comma formatting
+                ))
+            
+           
+            cursor.close()
+            connection.close()
+            
+            
+        except Error as e:
+            print(f"Database error: {e}")
+            messagebox.showerror("Database Error")
         except Exception as e:
-            print(f"Error loading: {e}")
+            print(f"General error: {e}")
+            messagebox.showerror("Error", 
+                f"An unexpected error occurred: {e}")
 
 
 def main():
     root = tk.Tk()
-    root.geometry("1000x600")  
+    root.geometry("1000x600")
     app = CustomerTable(root)
     root.mainloop()
 
